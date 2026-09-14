@@ -7,3 +7,11 @@ export async function createCheckoutSession(plan) {
   if (!data?.url) throw new Error(data?.error || 'Checkout could not be created.');
   window.location.assign(data.url);
 }
+
+export async function openCustomerPortal() {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { data, error } = await supabase.functions.invoke('create-customer-portal-session', { body: {} });
+  if (error) throw error;
+  if (!data?.url) throw new Error(data?.error || 'Customer portal could not be opened.');
+  window.location.assign(data.url);
+}
