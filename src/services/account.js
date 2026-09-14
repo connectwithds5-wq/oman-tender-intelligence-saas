@@ -33,12 +33,13 @@ export function subscribeToAuth(callback) {
 }
 
 export async function loadAccountData(userId) {
-  if (!supabase || !userId) return { profile: null, saved: [] };
-  const [{ data: profile }, { data: saved }] = await Promise.all([
+  if (!supabase || !userId) return { profile: null, saved: [], subscription: null };
+  const [{ data: profile }, { data: saved }, { data: subscription }] = await Promise.all([
     supabase.from('profiles').select('company_name,sectors,locations,contract_size,plan').eq('id', userId).maybeSingle(),
     supabase.from('saved_tenders').select('tender_id').eq('user_id', userId).order('created_at', { ascending: false }),
+    supabase.from('subscriptions').select('plan,status,current_period_end,cancel_at_period_end').eq('user_id', userId).maybeSingle(),
   ]);
-  return { profile, saved: (saved ?? []).map((row) => row.tender_id) };
+  return { profile, saved: (saved ?? []).map((row) => row.tender_id), subscription };
 }
 
 export async function saveProfile(userId, profile) {
