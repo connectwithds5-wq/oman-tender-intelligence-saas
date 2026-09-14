@@ -1,4 +1,5 @@
 import { tenders as demoTenders } from '../data/tenders.js';
+import { supabase } from '../lib/supabase.js';
 
 const SOURCE_URL = import.meta.env.VITE_TENDER_SOURCE_URL?.trim();
 
@@ -7,10 +8,7 @@ function asString(value, fallback = '') {
 }
 
 function normalizeTender(item, index) {
-  const tags = Array.isArray(item.tags)
-    ? item.tags.map((tag) => asString(tag)).filter(Boolean)
-    : [];
-
+  const tags = Array.isArray(item.tags) ? item.tags.map((tag) => asString(tag)).filter(Boolean) : [];
   return {
     id: asString(item.id, `UPSTREAM-${index + 1}`),
     title: asString(item.title || item.name, 'Untitled tender'),
@@ -23,6 +21,7 @@ function normalizeTender(item, index) {
     tags,
     status: asString(item.status, 'Open'),
     summary: asString(item.summary || item.description, 'No summary available.'),
+    source_url: asString(item.source_url, ''),
   };
 }
 
@@ -34,50 +33,33 @@ function extractItems(payload) {
   return [];
 }
 
-/**
- * Read-only tender source boundary.
- *
- * The upstream URL is intentionally supplied through VITE_TENDER_SOURCE_URL.
- * No credentials are accepted here because Vite exposes client-side env values.
- * Authenticated/private upstreams must be proxied by a server-side API later.
- */
 export async function loadTenders() {
-  if (!SOURCE_URL) {
-    return {
-      tenders: demoTenders,
-      source: 'demo',
-      sourceLabel: 'Demo data',
-    };
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('live_tenders')
+        .select('id,title,authority,category,location,value,deadline,score,tags,status,summary,source_url')
+        .order('updated_at', { ascending: false })
+        .limit(500);
+      if (!error && data?.length) {
+        return { tenders: data.map(normalizeTender), source: 'live', sourceLabel: 'Oman ESNAD live source' };
+      }
+    } catch (error) {
+      console.warn('[TenderSource] Live database read failed:', error);
+    }
   }
 
+  if (!SOURCE_URL) return { tenders: demoTenders, source: 'demo', sourceLabel: 'Demo data' };
+
   try {
-    const response = await fetch(SOURCE_URL, {
-      headers: { Accept: 'application/json' },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Tender source returned HTTP ${response.status}`);
-    }
-
+    const response = await fetch(SOURCE_URL, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Tender source returned HTTP ${response.status}`);
     const payload = await response.json();
     const items = extractItems(payload);
-
-    if (!items.length) {
-      throw new Error('Tender source returned no recognizable tender records');
-    }
-
-    return {
-      tenders: items.map(normalizeTender),
-      source: 'upstream',
-      sourceLabel: 'Connected source',
-    };
+    if (!items.length) throw new Error('Tender source returned no recognizable tender records');
+    return { tenders: items.map(normalizeTender), source: 'upstream', sourceLabel: 'Connected source' };
   } catch (error) {
     console.warn('[TenderSource] Falling back to demo data:', error);
-    return {
-      tenders: demoTenders,
-      source: 'demo-fallback',
-      sourceLabel: 'Demo fallback',
-      error: error instanceof Error ? error.message : 'Unknown source error',
-    };
+    return { tenders: demoTenders, source: 'demo-fallback', sourceLabel: 'Demo fallback', error: error instanceof Error ? error.message : 'Unknown source error' };
   }
 }
