@@ -1,0 +1,9 @@
+export const tenders = [
+  { id:'OTI-001', title:'Supply and Installation of Network Infrastructure', authority:'Oman Broadband', category:'IT & Telecom', location:'Muscat', value:'OMR 185,000', deadline:'2026-09-28', score:96, tags:['networking','fiber','telecom'], status:'Open', summary:'Supply, installation and commissioning of network infrastructure and associated works.' },
+  { id:'OTI-002', title:'Building Maintenance Services – Muscat Region', authority:'Government Entity', category:'Facilities', location:'Muscat', value:'OMR 420,000', deadline:'2026-10-04', score:89, tags:['maintenance','facilities','MEP'], status:'Open', summary:'Multi-year building maintenance services covering MEP, civil and preventive maintenance.' },
+  { id:'OTI-003', title:'Enterprise Software Licensing and Support', authority:'Major Oman Enterprise', category:'IT & Software', location:'Muscat', value:'OMR 96,000', deadline:'2026-09-24', score:84, tags:['software','licensing','support'], status:'Open', summary:'Enterprise software licenses, implementation support and annual maintenance.' },
+  { id:'OTI-004', title:'Electrical Works and Preventive Maintenance', authority:'Industrial Client', category:'Electrical', location:'Sohar', value:'OMR 275,000', deadline:'2026-10-12', score:78, tags:['electrical','maintenance','industrial'], status:'Open', summary:'Electrical maintenance and corrective works for industrial facilities in Sohar.' },
+  { id:'OTI-005', title:'Civil Construction and Renovation Works', authority:'Public Sector Client', category:'Construction', location:'Salalah', value:'OMR 610,000', deadline:'2026-10-18', score:72, tags:['civil','construction','renovation'], status:'Open', summary:'Civil construction, renovation and associated infrastructure works.' }
+];
+
+export function getTender(id) { return tenders.find(t => t.id === id); }
