@@ -34,18 +34,18 @@ export function getTenderMatchReasons(tender, profile) {
     const s = sectors[i];
     return sector === s || sector.includes(s) || s.includes(sector) || text.includes(s);
   });
-  if (matchedSector) reasons.push({ type: 'sector', label: 'Sector', value: matchedSector });
+  if (matchedSector) reasons.push(`Sector: ${matchedSector}`);
 
   const matchedLocation = (profile?.locations || []).find((original, i) => {
     const l = locations[i];
     return location === l || location.includes(l) || l.includes(location);
   });
-  if (matchedLocation) reasons.push({ type: 'location', label: 'Location', value: matchedLocation });
+  if (matchedLocation) reasons.push(`Location: ${matchedLocation}`);
 
   const preferredBand = contractBand(profile?.size);
   const tenderBand = tenderValueBand(tender.value);
   if (preferredBand !== 'unknown' && tenderBand !== 'unknown' && preferredBand === tenderBand) {
-    reasons.push({ type: 'size', label: 'Contract size', value: prettyBand(tenderBand) });
+    reasons.push(`Contract size: ${prettyBand(tenderBand)}`);
   }
 
   return reasons;
