@@ -60,9 +60,11 @@ export function getTenderMatchBreakdown(tender, profile) {
 }
 
 export function getTenderMatchReasons(tender, profile) {
-  return getTenderMatchBreakdown(tender, profile).breakdown
-    .filter(item => item.tone === 'positive' && item.label !== 'Profile keyword relevance')
-    .map(item => item.label);
+  const { breakdown, total } = getTenderMatchBreakdown(tender, profile);
+  return [
+    `Score breakdown: ${breakdown.map(item => `${item.label} ${item.value >= 0 ? '+' : ''}${item.value}`).join(' · ')} = ${total}%`,
+    ...breakdown.filter(item => item.tone === 'positive' && item.label !== 'Profile keyword relevance').map(item => item.label),
+  ];
 }
 
 export function tailorTenderScore(tender, profile) {
