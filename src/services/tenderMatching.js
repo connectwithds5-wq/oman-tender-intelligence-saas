@@ -18,6 +18,10 @@ function tenderValueBand(value) {
   return 'over300';
 }
 
+function prettyBand(band) {
+  return ({ under100: 'Under OMR 100k', 100to300: 'OMR 100k–300k', over300: 'OMR 300k+' })[band] || '';
+}
+
 export function getTenderMatchReasons(tender, profile) {
   const sectors = (profile?.sectors || []).map(normalize).filter(Boolean);
   const locations = (profile?.locations || []).map(normalize).filter(Boolean);
@@ -26,18 +30,22 @@ export function getTenderMatchReasons(tender, profile) {
   const text = normalize(`${tender.title} ${tender.summary} ${(tender.tags || []).join(' ')}`);
   const reasons = [];
 
-  if (sectors.length && sectors.some(s => sector === s || sector.includes(s) || s.includes(sector) || text.includes(s))) {
-    reasons.push('Sector match');
-  }
+  const matchedSector = (profile?.sectors || []).find((original, i) => {
+    const s = sectors[i];
+    return sector === s || sector.includes(s) || s.includes(sector) || text.includes(s);
+  });
+  if (matchedSector) reasons.push({ type: 'sector', label: 'Sector', value: matchedSector });
 
-  if (locations.length && locations.some(l => location === l || location.includes(l) || l.includes(location))) {
-    reasons.push('Location match');
-  }
+  const matchedLocation = (profile?.locations || []).find((original, i) => {
+    const l = locations[i];
+    return location === l || location.includes(l) || l.includes(location);
+  });
+  if (matchedLocation) reasons.push({ type: 'location', label: 'Location', value: matchedLocation });
 
   const preferredBand = contractBand(profile?.size);
   const tenderBand = tenderValueBand(tender.value);
   if (preferredBand !== 'unknown' && tenderBand !== 'unknown' && preferredBand === tenderBand) {
-    reasons.push('Contract size match');
+    reasons.push({ type: 'size', label: 'Contract size', value: prettyBand(tenderBand) });
   }
 
   return reasons;
