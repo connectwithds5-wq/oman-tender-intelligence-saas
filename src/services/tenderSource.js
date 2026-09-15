@@ -1,6 +1,7 @@
 import { tenders as demoTenders } from '../data/tenders.js';
 import { supabase } from '../lib/supabase.js';
 import { tailorTenders } from './tenderMatching.js';
+import { translateTenders } from './tenderTranslation.js';
 
 const SOURCE_URL = import.meta.env.VITE_TENDER_SOURCE_URL?.trim();
 
@@ -59,7 +60,12 @@ async function getCompanyProfile() {
 }
 
 async function tailor(items) {
-  const normalized = items.map(normalizeTender);
+  let normalized = items.map(normalizeTender);
+  try {
+    normalized = await translateTenders(normalized);
+  } catch (error) {
+    console.warn('[TenderSource] Translation skipped:', error);
+  }
   const profile = await getCompanyProfile();
   return {
     tenders: profile ? tailorTenders(normalized, profile) : normalized,
