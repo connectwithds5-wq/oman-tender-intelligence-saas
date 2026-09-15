@@ -58,9 +58,13 @@ async function getCompanyProfile() {
   }
 }
 
-function tailor(items) {
+async function tailor(items) {
   const normalized = items.map(normalizeTender);
-  return getCompanyProfile().then((profile) => profile ? tailorTenders(normalized, profile) : normalized);
+  const profile = await getCompanyProfile();
+  return {
+    tenders: profile ? tailorTenders(normalized, profile) : normalized,
+    tailored: Boolean(profile),
+  };
 }
 
 export async function loadTenders() {
@@ -68,8 +72,12 @@ export async function loadTenders() {
     try {
       const data = await readLiveTenders();
       if (data.length) {
-        const tenders = await tailor(data);
-        return { tenders, source: 'live', sourceLabel: tenders === data ? 'Oman ESNAD live source' : 'Oman ESNAD · tailored to your profile' };
+        const result = await tailor(data);
+        return {
+          tenders: result.tenders,
+          source: 'live',
+          sourceLabel: result.tailored ? 'Oman ESNAD · tailored to your profile' : 'Oman ESNAD live source',
+        };
       }
     } catch (error) {
       console.warn('[TenderSource] Cached live source unavailable:', error);
@@ -84,8 +92,12 @@ export async function loadTenders() {
     const payload = await response.json();
     const items = extractItems(payload);
     if (!items.length) throw new Error('Tender source returned no recognizable tender records');
-    const tenders = await tailor(items);
-    return { tenders, source: 'upstream', sourceLabel: 'Connected source · tailored to your profile' };
+    const result = await tailor(items);
+    return {
+      tenders: result.tenders,
+      source: 'upstream',
+      sourceLabel: result.tailored ? 'Connected source · tailored to your profile' : 'Connected source',
+    };
   } catch (error) {
     console.warn('[TenderSource] Falling back to demo data:', error);
     return { tenders: demoTenders, source: 'demo-fallback', sourceLabel: 'Demo fallback', error: error instanceof Error ? error.message : 'Unknown error' };
