@@ -20,6 +20,12 @@ export async function signUp(email, password) {
   return data.session;
 }
 
+export async function resendSignupEmail(email) {
+  if (!supabase) throw new Error('Supabase is not configured.');
+  const { error } = await supabase.auth.resend({ type: 'signup', email });
+  if (error) throw error;
+}
+
 export async function signOut() {
   if (!supabase) return;
   const { error } = await supabase.auth.signOut();
