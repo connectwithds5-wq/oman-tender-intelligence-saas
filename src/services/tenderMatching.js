@@ -18,6 +18,31 @@ function tenderValueBand(value) {
   return 'over300';
 }
 
+export function getTenderMatchReasons(tender, profile) {
+  const sectors = (profile?.sectors || []).map(normalize).filter(Boolean);
+  const locations = (profile?.locations || []).map(normalize).filter(Boolean);
+  const sector = normalize(tender.category);
+  const location = normalize(tender.location);
+  const text = normalize(`${tender.title} ${tender.summary} ${(tender.tags || []).join(' ')}`);
+  const reasons = [];
+
+  if (sectors.length && sectors.some(s => sector === s || sector.includes(s) || s.includes(sector) || text.includes(s))) {
+    reasons.push('Sector match');
+  }
+
+  if (locations.length && locations.some(l => location === l || location.includes(l) || l.includes(location))) {
+    reasons.push('Location match');
+  }
+
+  const preferredBand = contractBand(profile?.size);
+  const tenderBand = tenderValueBand(tender.value);
+  if (preferredBand !== 'unknown' && tenderBand !== 'unknown' && preferredBand === tenderBand) {
+    reasons.push('Contract size match');
+  }
+
+  return reasons;
+}
+
 export function tailorTenderScore(tender, profile) {
   const sectors = (profile?.sectors || []).map(normalize).filter(Boolean);
   const locations = (profile?.locations || []).map(normalize).filter(Boolean);
@@ -25,34 +50,24 @@ export function tailorTenderScore(tender, profile) {
   const location = normalize(tender.location);
   const text = normalize(`${tender.title} ${tender.summary} ${(tender.tags || []).join(' ')}`);
 
-  // Start from the source relevance score, then apply company-specific signals.
   let score = Number.isFinite(Number(tender.score)) ? Number(tender.score) : 50;
-  let matched = [];
 
   if (sectors.length) {
     const sectorMatch = sectors.some(s => sector === s || sector.includes(s) || s.includes(sector) || text.includes(s));
     score += sectorMatch ? 12 : -5;
-    if (sectorMatch) matched.push('sector');
   }
 
   if (locations.length) {
     const locationMatch = locations.some(l => location === l || location.includes(l) || l.includes(location));
     score += locationMatch ? 8 : -3;
-    if (locationMatch) matched.push('location');
   }
 
   const preferredBand = contractBand(profile?.size);
   const tenderBand = tenderValueBand(tender.value);
   if (preferredBand !== 'unknown' && tenderBand !== 'unknown') {
-    if (preferredBand === tenderBand) {
-      score += 8;
-      matched.push('contract size');
-    } else {
-      score -= 2;
-    }
+    score += preferredBand === tenderBand ? 8 : -2;
   }
 
-  // Small bonus for exact company-profile terms appearing in the opportunity.
   const keywordHits = sectors.filter(s => text.includes(s)).length;
   score += Math.min(6, keywordHits * 2);
 
