@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { signIn, signUp } from '../services/account.js';
+import './auth.css';
 
 export default function AuthGate({ onAuthenticated }) {
   const [mode, setMode] = useState('signin');
