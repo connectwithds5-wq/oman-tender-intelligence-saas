@@ -33,21 +33,23 @@ function extractItems(payload) {
   return [];
 }
 
+async function readLiveTenders() {
+  const { data, error } = await supabase
+    .from('live_tenders')
+    .select('id,title,authority,category,location,value,deadline,score,tags,status,summary,source_url')
+    .order('updated_at', { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function loadTenders() {
   if (supabase) {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData.session) {
-        await supabase.functions.invoke('sync-oman-tenders', { body: {} });
-      }
-      const { data, error } = await supabase
-        .from('live_tenders')
-        .select('id,title,authority,category,location,value,deadline,score,tags,status,summary,source_url')
-        .order('updated_at', { ascending: false })
-        .limit(500);
-      if (!error && data?.length) return { tenders: data.map(normalizeTender), source: 'live', sourceLabel: 'Oman ESNAD live source' };
+      const data = await readLiveTenders();
+      if (data.length) return { tenders: data.map(normalizeTender), source: 'live', sourceLabel: 'Oman ESNAD live source' };
     } catch (error) {
-      console.warn('[TenderSource] Live source unavailable:', error);
+      console.warn('[TenderSource] Cached live source unavailable:', error);
     }
   }
 
@@ -64,4 +66,12 @@ export async function loadTenders() {
     console.warn('[TenderSource] Falling back to demo data:', error);
     return { tenders: demoTenders, source: 'demo-fallback', sourceLabel: 'Demo fallback', error: error instanceof Error ? error.message : 'Unknown error' };
   }
+}
+
+export async function refreshTenders() {
+  if (!supabase) return loadTenders();
+  const { data, error } = await supabase.functions.invoke('sync-oman-tenders', { body: {} });
+  if (error) throw error;
+  const result = await loadTenders();
+  return { ...result, sync: data };
 }
