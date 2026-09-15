@@ -22,64 +22,51 @@ function prettyBand(band) {
   return ({ under100: 'Under OMR 100k', 100to300: 'OMR 100k–300k', over300: 'OMR 300k+' })[band] || '';
 }
 
-export function getTenderMatchReasons(tender, profile) {
+export function getTenderMatchBreakdown(tender, profile) {
   const sectors = (profile?.sectors || []).map(normalize).filter(Boolean);
   const locations = (profile?.locations || []).map(normalize).filter(Boolean);
   const sector = normalize(tender.category);
   const location = normalize(tender.location);
   const text = normalize(`${tender.title} ${tender.summary} ${(tender.tags || []).join(' ')}`);
-  const reasons = [];
+  const baseScore = Number.isFinite(Number(tender.score)) ? Number(tender.score) : 50;
+  const breakdown = [{ label: 'Source relevance', value: baseScore, tone: 'base' }];
 
   const matchedSector = (profile?.sectors || []).find((original, i) => {
     const s = sectors[i];
     return sector === s || sector.includes(s) || s.includes(sector) || text.includes(s);
   });
-  if (matchedSector) reasons.push(`Sector: ${matchedSector}`);
+  if (sectors.length) breakdown.push({ label: matchedSector ? `Sector: ${matchedSector}` : 'Sector mismatch', value: matchedSector ? 12 : -5, tone: matchedSector ? 'positive' : 'negative' });
 
   const matchedLocation = (profile?.locations || []).find((original, i) => {
     const l = locations[i];
     return location === l || location.includes(l) || l.includes(location);
   });
-  if (matchedLocation) reasons.push(`Location: ${matchedLocation}`);
-
-  const preferredBand = contractBand(profile?.size);
-  const tenderBand = tenderValueBand(tender.value);
-  if (preferredBand !== 'unknown' && tenderBand !== 'unknown' && preferredBand === tenderBand) {
-    reasons.push(`Contract size: ${prettyBand(tenderBand)}`);
-  }
-
-  return reasons;
-}
-
-export function tailorTenderScore(tender, profile) {
-  const sectors = (profile?.sectors || []).map(normalize).filter(Boolean);
-  const locations = (profile?.locations || []).map(normalize).filter(Boolean);
-  const sector = normalize(tender.category);
-  const location = normalize(tender.location);
-  const text = normalize(`${tender.title} ${tender.summary} ${(tender.tags || []).join(' ')}`);
-
-  let score = Number.isFinite(Number(tender.score)) ? Number(tender.score) : 50;
-
-  if (sectors.length) {
-    const sectorMatch = sectors.some(s => sector === s || sector.includes(s) || s.includes(sector) || text.includes(s));
-    score += sectorMatch ? 12 : -5;
-  }
-
-  if (locations.length) {
-    const locationMatch = locations.some(l => location === l || location.includes(l) || l.includes(location));
-    score += locationMatch ? 8 : -3;
-  }
+  if (locations.length) breakdown.push({ label: matchedLocation ? `Location: ${matchedLocation}` : 'Location mismatch', value: matchedLocation ? 8 : -3, tone: matchedLocation ? 'positive' : 'negative' });
 
   const preferredBand = contractBand(profile?.size);
   const tenderBand = tenderValueBand(tender.value);
   if (preferredBand !== 'unknown' && tenderBand !== 'unknown') {
-    score += preferredBand === tenderBand ? 8 : -2;
+    const match = preferredBand === tenderBand;
+    breakdown.push({ label: match ? `Contract size: ${prettyBand(tenderBand)}` : 'Contract size mismatch', value: match ? 8 : -2, tone: match ? 'positive' : 'negative' });
   }
 
   const keywordHits = sectors.filter(s => text.includes(s)).length;
-  score += Math.min(6, keywordHits * 2);
+  const keywordBonus = Math.min(6, keywordHits * 2);
+  if (keywordBonus) breakdown.push({ label: 'Profile keyword relevance', value: keywordBonus, tone: 'positive' });
 
-  return Math.max(0, Math.min(99, Math.round(score)));
+  const rawTotal = breakdown.reduce((sum, item) => sum + item.value, 0);
+  const total = Math.max(0, Math.min(99, Math.round(rawTotal)));
+  return { baseScore, total, breakdown };
+}
+
+export function getTenderMatchReasons(tender, profile) {
+  return getTenderMatchBreakdown(tender, profile).breakdown
+    .filter(item => item.tone === 'positive' && item.label !== 'Profile keyword relevance')
+    .map(item => item.label);
+}
+
+export function tailorTenderScore(tender, profile) {
+  return getTenderMatchBreakdown(tender, profile).total;
 }
 
 export function tailorTenders(tenders, profile) {
