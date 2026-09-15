@@ -19,7 +19,7 @@ function tenderValueBand(value) {
 }
 
 function prettyBand(band) {
-  return ({ under100: 'Under OMR 100k', 100to300: 'OMR 100k–300k', over300: 'OMR 300k+' })[band] || '';
+  return ({ under100: 'Under OMR 100k', '100to300': 'OMR 100k–300k', over300: 'OMR 300k+' })[band] || '';
 }
 
 export function getTenderMatchBreakdown(tender, profile) {
