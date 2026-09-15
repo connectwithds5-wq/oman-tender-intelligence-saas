@@ -1,5 +1,6 @@
 import { tenders as demoTenders } from '../data/tenders.js';
 import { supabase } from '../lib/supabase.js';
+import { tailorTenders } from './tenderMatching.js';
 
 const SOURCE_URL = import.meta.env.VITE_TENDER_SOURCE_URL?.trim();
 
@@ -33,21 +34,43 @@ function extractItems(payload) {
   return [];
 }
 
-async function readLiveTenders() {
-  const { data, error } = await supabase
-    .from('live_tenders')
-    .select('id,title,authority,category,location,value,deadline,score,tags,status,summary,source_url')
-    .order('updated_at', { ascending: false })
-    .limit(500);
-  if (error) throw error;
-  return data ?? [];
+async function getCompanyProfile() {
+  if (!supabase) return null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return null;
+    const { data } = await supabase
+      .from('profiles')
+      .select('company_name,sectors,locations,contract_size')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      company: data.company_name || '',
+      sectors: data.sectors || [],
+      locations: data.locations || [],
+      size: data.contract_size || '',
+    };
+  } catch (error) {
+    console.warn('[TenderSource] Company profile unavailable:', error);
+    return null;
+  }
+}
+
+function tailor(items) {
+  const normalized = items.map(normalizeTender);
+  return getCompanyProfile().then((profile) => profile ? tailorTenders(normalized, profile) : normalized);
 }
 
 export async function loadTenders() {
   if (supabase) {
     try {
       const data = await readLiveTenders();
-      if (data.length) return { tenders: data.map(normalizeTender), source: 'live', sourceLabel: 'Oman ESNAD live source' };
+      if (data.length) {
+        const tenders = await tailor(data);
+        return { tenders, source: 'live', sourceLabel: tenders === data ? 'Oman ESNAD live source' : 'Oman ESNAD · tailored to your profile' };
+      }
     } catch (error) {
       console.warn('[TenderSource] Cached live source unavailable:', error);
     }
@@ -61,11 +84,22 @@ export async function loadTenders() {
     const payload = await response.json();
     const items = extractItems(payload);
     if (!items.length) throw new Error('Tender source returned no recognizable tender records');
-    return { tenders: items.map(normalizeTender), source: 'upstream', sourceLabel: 'Connected source' };
+    const tenders = await tailor(items);
+    return { tenders, source: 'upstream', sourceLabel: 'Connected source · tailored to your profile' };
   } catch (error) {
     console.warn('[TenderSource] Falling back to demo data:', error);
     return { tenders: demoTenders, source: 'demo-fallback', sourceLabel: 'Demo fallback', error: error instanceof Error ? error.message : 'Unknown error' };
   }
+}
+
+async function readLiveTenders() {
+  const { data, error } = await supabase
+    .from('live_tenders')
+    .select('id,title,authority,category,location,value,deadline,score,tags,status,summary,source_url')
+    .order('updated_at', { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function refreshTenders() {
